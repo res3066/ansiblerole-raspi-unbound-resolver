@@ -1,0 +1,87 @@
+---
+
+  - name: traceroute present
+    apt: name=traceroute state=latest
+
+  - name: tcpdump latest
+    apt: name=tcpdump state=latest
+
+  - name: bmake latest
+    apt: name=bmake state=latest
+    when: raspi_unbound_void_zones is defined
+
+  - name: git latest
+    apt: name=git state=latest
+    when: raspi_unbound_void_zones is defined
+
+  - name: checking for /etc/unbound/
+    file: dest=/etc/unbound state=directory owner=root group=root mode=0755
+
+  - name: checking for /var/unbound/
+    file: dest=/var/unbound state=directory owner=root group=root mode=0755
+
+  - name: fetching https://github.com/cyclaero/void-zones-tools
+    git:
+      repo: https://github.com/cyclaero/void-zones-tools
+      dest: /home/pi/void-zones-tools
+    when: raspi_unbound_void_zones is defined
+   
+  - name: building void-zones-tools
+    shell: bmake install clean
+    args:
+      chdir: /home/pi/void-zones-tools
+      creates: /usr/local/bin/hosts2zones
+    when: raspi_unbound_void_zones is defined
+
+  - name: using curl -s instead of fetch
+    lineinfile:
+      regex: "(No fetch utility can be|On Mac OS X, execute|fetch from source into)"
+      path: /usr/local/bin/void-zones-update.sh
+      state: absent
+
+  - name: using curl -s instead of fetch
+    lineinfile:
+      regex: "(FETCH='/usr/bin/curl -s'|exit 1)"
+      line: "FETCH='/usr/bin/curl -s'"
+      path: /usr/local/bin/void-zones-update.sh
+      state: present
+
+  - name: building local-void.zones
+    shell: /usr/local/bin/void-zones-update.sh
+    when: raspi_unbound_void_zones is defined
+
+
+
+  - template: src=unbound.conf.j2 dest=/etc/unbound/unbound.conf owner=root mode=0664
+
+  - get_url: url=ftp://FTP.INTERNIC.NET/domain/named.cache dest=/etc/unbound/named.cache owner=root group=root mode=0644 force=yes
+
+  - name: unbound latest
+    apt: name=unbound state=latest
+
+#  - name: checking for host custom dhcpd.conf
+#    local_action:
+#      module: stat
+#      path: "{{ host_specific_files }}/dhcpd.conf"
+#    register: ub
+
+#  - name: host-custom unbound.conf
+#    copy: src={{ host_specific_files }}/unbound.conf dest=/etc/unbound owner=root group=root mode=0664
+#    when: ub.stat.islnk is defined
+
+  - name: dig(1) and friends present
+    apt: name=dnsutils state=latest
+
+  - name: drill(1) and friends present
+    apt: name=ldnsutils state=latest
+
+  - name: dnstop latest
+    apt: name=dnstop state=latest
+
+  - name: mtr-tiny latest
+    apt: name=mtr-tiny state=latest
+
+  - systemd: name=unbound.service  enabled=yes state=restarted
+
+
+...

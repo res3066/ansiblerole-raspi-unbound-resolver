@@ -1,0 +1,66 @@
+## Simple recursive caching DNS, UDP port 53
+#
+{{ ansible_managed | comment }}
+
+server:
+
+	access-control: 127.0.0.0/8 allow
+	access-control: ::1 allow
+{% if raspi_dns_query_sources is defined %}
+{% for p in raspi_dns_query_sources %}
+	access-control: {{ p }} allow
+{% endfor %}
+{% else %}
+#
+# Wondering why you aren't getting any whitelisted prefixes defined here?
+# Try configuring raspi_dns_query_sources (maybe in group_vars/all.yml)
+#
+{% endif %}
+        access-control: ::0/0 deny
+	access-control: 0.0.0.0/0 deny
+
+	cache-max-ttl: {{ raspi_unbound_cache_max_ttl | default(14400) }}
+	cache-min-ttl: {{ raspi_unbound_cache_min_ttl | default(60) }}
+	hide-identity: {{ raspi_unbound_hide_identity | default("yes") }}
+	hide-version: {{ raspi_unbound_hide_version | default("yes") }}
+	interface: {{ raspi_unbound_listen_interface | default("0.0.0.0") }}
+        port: {{ raspi_unbound_listen_port | default(53) }}
+	minimal-responses: yes
+	prefetch: yes
+	qname-minimisation: no
+	rrset-roundrobin: yes
+	use-caps-for-id: no
+	verbosity: 1
+
+        edns-buffer-size: 1400
+
+	do-ip4: {{ raspi_unbound_do_ip6 | default("yes") }}
+	do-ip6: {{ raspi_unbound_do_ip6 | default("yes") }}
+	do-udp: {{ raspi_unbound_do_udp | default("yes") }}
+	do-tcp: {{ raspi_unbound_do_tcp | default("yes") }}
+
+{% if raspi_dont_dnssec_validate is not defined %}
+	root-hints: /etc/unbound/named.cache
+        auto-trust-anchor-file: "/var/lib/unbound/root.key"
+{% endif %}
+
+	num-threads: 4
+	msg-cache-slabs: 8
+	rrset-cache-slabs: 8
+	infra-cache-slabs: 8
+	key-cache-slabs: 8
+
+        rrset-cache-size: 64m
+        msg-cache-size: 32m
+        so-rcvbuf: 1m
+
+{% if raspi_unbound_void_zones is defined %}
+include: "/var/unbound/local-void.zones"
+{% endif %}
+
+remote-control:
+	control-enable: yes
+	control-interface: 127.0.0.1
+	control-use-cert: no
+
+
